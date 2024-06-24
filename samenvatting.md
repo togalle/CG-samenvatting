@@ -45,6 +45,10 @@
   - [5: Texture Mapping](#5-texture-mapping)
     - [Aliasing](#aliasing)
   - [6: Viewing in 3D](#6-viewing-in-3d)
+    - [Planar Geometric Projections](#planar-geometric-projections)
+      - [Parallel projections](#parallel-projections)
+      - [Perspective projections](#perspective-projections)
+    - [Synthetic Camera Model](#synthetic-camera-model)
 
 ## 1: Introduction
 
@@ -588,3 +592,58 @@ When great detail or high realism is needed and computational complexity can be 
 > Bump mapping changes the look of an object by influencing the way it interacts with light, but doesn't change the actual geometry, meaning that from certain angles the object still appears flat (for example when looking at the edge). Displacement mapping solves this by actually changing the geometry of the object (the vertex placement, not the normals).
 
 ## 6: Viewing in 3D
+
+Coming at the end, we can now see how we actually project our 3D world onto our 2D screen! The conceptual model for rendering a scene onto a screen has a few steps:
+
+1. Clip objects against view frustum: objects that aren't in sight are useless to use for that moment, so ignore them
+2. Project onto view plane: the objects which are visible are projected onto a flat surface
+3. Transform into viewport: the viewplane is further transformed into the desired viewport
+
+### Planar Geometric Projections
+
+There are two main projection types: perspective and parallel. The tree below shows a great overview of all the subcategories of each type of projection:
+
+![projection categories](image-35.png)
+
+Note that perspective projection makes use of vanishing points, so if no vanishing points are present, it can't be called perspective projection.
+
+#### Parallel projections
+
+When looking at parallel projections, the first distinction is based on the Direction Of Projection (DOP) and the View Plane Normal (VPN). When these align, we talk about orthographic projection, otherwise it's oblique projection. Orthographic projection can then be further divided between multiview and axonometric projection, based on whether or not the object is viewed straight on or at an angle.
+
+![parallel projections](image-36.png)
+
+Axonometric projections in turn can be further subdivided based on the angle between the VPN and the axes of the object. If all axes create the same angle, it's isometric projection. Two axes makes dimetric and one makes trimetric. The phenomenon where the length of an object gets shorter based on the viewing angle is called foreshortening (imagine looking at a pencil and then turning the tip towards your eye, slowly making the pencil appear more and more short). Apparently foreshoretening can look natural or unnatural, but Danilo didn't mention either case lol.
+
+Oblique projection has two subcategories: cavalier and cabinet projection. This is based on whether or not the object undergoes foreshortening. **Cavalier** applies no foreshortening, so all lines of the object retain their original length. **Cabinet** does apply foreshortening, mostly with a factor of 0.5 (foreshortened lines are only half as long).
+
+> Oblique projection is parallel projection where the direction of projection doesn't line up with the view direction. The different oblique projections are Cavalier and Cabinet, where the former doesn't apply foreshortening and the latter does apply foreshortening (mostly by a factor of 0.5).
+
+#### Perspective projections
+
+Perspective projections introduce the concept of vanishing points, where parallel lines converge to a single point. In perspective, objects further away will appear smaller than objects close to the viewer. Perspective projection is mainly grouped into either one, two or three point perspective (*technically* there's also four and five, and *technically* there's just infinite vanishing points in a realistic scene because any set of parallel lines needs its own vanishing point but that's just my thought, though this did get asked on an exam lol). Below are some examples of popular projection techniques.
+
+![projection techniques](image-37.png)
+
+Both types (parallel and perspective) have their own use. Parallel is good for technical drawings, if lengths should be preserved etc. Perspective is good when you need a natural looking scene. In both cases, angles only remain intact for faces parallel to projection plane.
+
+### Synthetic Camera Model
+
+Now that we know how objects can be projected onto a flat surface, we still need to create this flat surface to project onto! This is done using a virtual camera that looks at the scene. This camera requires a few properties:
+
+1. **Position** (from where it’s looking; ‘eye’ vector)
+2. **Orientation** (direction in which the camera is pointing, the **look vector**, and the rotation around that direction, the **view up vector**)
+3. **Field of view** (aspect ratio of the electronic “film”, viewing angles)
+4. Front and back **clipping planes**
+
+You can also optionally specify the focal length, indicating what distance objects are seen as sharp.
+
+Note that the view up vector doesn't need to be perpendicular to the look vector! As long as it's in any direction that points up, it's correct (Danilo didn't elaborate that much on it, but I assume you can imagine a half circle above the look vector on which any vector would be considered a correct up vector).
+
+![synthetic camera](image-38.png)
+
+The fiels of view can be defined with two angles (width and height), but is mostly defined by the width angle and an aspect ratio (w/h). Furthermore, a front and back clipping plane is chosen to define the view frustum: all objects inside the frustum will be taken into account when rendering, everything else is clipped away. The view plane itself can be placed anywhere within the view volume, doesn't have to be anywhere in the frustum in particular.
+
+The View Reference System (or View Reference Coordinates; VRC) is the right-handed system u-v-n, where v has the same direction as the View Up vector, n is the view plane normal, and u is an extra parameter to complete the right-hand system. The slide below shows a nice summary of this synthetic camera model. Note that the look vector is the same as the direction of projection, so if the view plane isn't perpendicular to the look vector, you get a distorted perspective projection, or **oblique** parallel projection!
+
+![synthetic camera view volume](image-39.png)

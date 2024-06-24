@@ -40,7 +40,10 @@
     - [Radiosity](#radiosity)
   - [4.2: Texture Synthesis](#42-texture-synthesis)
     - [Pyramidal Methods](#pyramidal-methods)
+    - [Image Quilting](#image-quilting)
+    - [Wang Tiles](#wang-tiles)
   - [5: Texture Mapping](#5-texture-mapping)
+    - [Aliasing](#aliasing)
   - [6: Viewing in 3D](#6-viewing-in-3d)
 
 ## 1: Introduction
@@ -477,10 +480,111 @@ The goal of texture synthesis is creating a larger texture from a smaller base w
 
 ### Pyramidal Methods
 
-Pyramidal decomposition means creating different levels of detail of a certain texture. The Gaussian pyramid is simply taking your texture and downsampling it a couple of times to create smaller and smaller versions. This can then be used to make a Laplacian pyramid, where the top of the pyramid is the same as the corresponding Gaussian pyramid, and the levels below are instead an image representing the difference needed to apply to the enlarged texture to get the original texture of that size.
+Pyramidal decomposition means creating different levels of detail of a certain texture. The Gaussian pyramid is simply taking your texture and downsampling it a couple of times to create smaller and smaller versions. This can then be used to make a Laplacian pyramid, where the top of the pyramid is the same as the corresponding Gaussian pyramid, and the levels below are instead an image representing the difference needed to apply to the enlarged texture to get the original texture of that size. Each level in the Laplacian pyramid can be broken down further into differences according to orientation.
 
 ![pyramids](image-26.png)
 
+In terms of the Discrete Wavelet Transform, this can also be applied here. Essentially, you compress an image in as many steps as you want to create your pyramid. In each step, you split the image horizontally and vertically and record the difference both horizontally, vertically and diagonally, and keep the resulting downscaled version in the top left corner. This can be done as many times as you like. The resulting difference in each level will contain peaks which indicate edges in the image.
+
+TODO: elaborate method
+
+Pyramidal methods work great for **homogenous stochastic** textures, but don't perform well when generating textures with a certain clear pattern.
+
+### Image Quilting
+
+This method essentially takes samples from a given texture to base itself off of when creating the new texture. Using these samples, they are sequentially places next to and under eachother with a small overlapping region. After this, the overlapping regions are merged in such a way that the two blocks have an optimal transition. This is done by basically calculating where the border should be in the overlapping region (this border is never a straight line, mostly it's wobbly.)
+
+![image quilting](image-27.png)
+
+The first step of positioning the overlapping blocks sequentially can be done randomly, but it's better to do it semi-randomly with **block-matching**. This is simply a condition where you choose a random new block and check if the difference in the overlapping regions between the two blocks is below a certain threshold before accepting the new block.
+
+The second step makes use of the quadractic error surface. Basically, you convert your pixels in the overlapping region to nodes of a graph. You then assign the quadratic error (or just the square of the difference) of each pixel to the node. After this, you calculate the shortest path through this zone to get your optimal border.
+
+This method works relatively well for all types of textures. This does come at the cost of computational complexity. It's also difficult to decide the block size to sample the original texture with, which does have a big influence.
+
+Another fun application of image quilting, with some modification of the original method, is texture transfer. Basically, if you have a texture and an image you want to apply the texture on, you kind of do the same two steps as regular image quilting. The first step, however, now makes samples and sees which samples correspond the most to certain regions of the target image. For example, transferring the texture of an orange to the image of a pear will make samples of the orange and correspond the highlight of the orange to the highlight of the pear. Basically this way the algorithm can match certain samples with certain regions of the target image. The second step is then the same.
+
+> The original objective function of image quilting to be used for texture transfer is modified by adding a correspondance factor to the first step to assign a value to how well a certain sample fits in a certain target region.
+
+### Wang Tiles
+
+Wang tiles essentially define a set of tiles that you can nicely line up in a grid while still staying random, without the need of overlapping regions and quilting. At first, mr Wang said that if you have a set that can make a correct tiling, this will eventually become periodic. However he was proved wrong 5 years later when someone proved there was a set of like hundres of tiles that become aperiodic. Recently, a set of 11 tiles has been found that's also aperiodic. There are also two rules regarding correct tiling and aperiodicity:
+
+![wang tile rules](image-28.png)
+
+The second rule has the following intuition: if you are about to place a tile and notice it would produce periodicity, choose the other one.
+
+> The minimal set of aperiodic Wang tiles is 11.
+
+Wang tiles can be made from a base texture simply by doing image quilting! This means that you create a set of tiles that already show the property of wang tiles with image quilting, and so when you created your set there is no more need for calculation of the optimal borders, you just line up the tiles, resulting in a low computational complexity for very large textures.
+
+> To create a set of Wang tiles, it's possible to use image quilting. You sample the base texture and stitch them together. Then, you can cut out the inner part of the larger tile to get one Wang tile, and you can use the original tiles again in a different configuration to create other wang tiles.
+
+![wang tile creation](image-29.png)
+
+This base principle is already great for generating a homogenous texture, but what if you wanted to make an inhomogenous one? You simply extend the base principle by assigning a density to each corner of your tiles. Now, when you create tiles, you need to assign a density to each corner of your tile. Lining them up now requires an additional rule of also adhering to the corners.
+
+> Basic Wang tiles can be extended with binary coding each corner to assign some property to them. This does result in more tiles, as lining up tiles correctly now also requires the corners to correspond.
+
+Normally you would think that a set of normally 8 tiles would be extended to 128 tiles `(8 * 2^4)`, but because only three corners need to line up, this can be reduced to 64 tiles `(8 * 2^3)`.
+
+> Applying this logic to the previously mentioned set of aperiodic Wang tiles, the smallest set of aperiodic and non-homogenous Wang tiles would be `11 * 2³ = 88`.
+
+Fun fact: there was something called the Einstein problem (doesn't have anything to do with the person, just german for "one stone"), which was searching for a single shape to fill the entire space aperiodically. This has been solved in 2015!
+
+![einstein tiles](image-30.png)
+
 ## 5: Texture Mapping
+
+In the previous part we learned how to use a small texture image and expand it to make a larger texture. This part is concenred with actually mapping a texture to an object. There are three types of texture mapping:
+
+- Texture mapping: mapping an image containing a texture to a mesh to fill in the polygons
+- Environment mapping: mapping the environment to an object to simulate a mirror-like effect
+- Bump mapping: simulating elevation on the object
+
+Texture mapping happens at the end of the rendering pipeline, for efficiency reasons. When the whole scene is created and you know what parts are visible and which are not, it's more efficient to map the textures only to what is visible.
+
+>Texture mapping may sound easy, but there are a couple of coordinate systems involved in the process:
+>
+>- **Parametric** coordinates: each object has its own coordinates
+>- **Texture** coordinates: coordinates within the texture image
+>- **Object** or World coordinates: where the texture mapping takes place
+>- **Window** (screen) coordinates: where the final image exists
+
+Basically what happens is you want to know for a pixel on the screen, what in the world that pixel shows, and what that part of the object corresponds to in the texture. This is called backward mapping.
+
+One solution to the mapping problem is two-part mapping. Basically, you first map a texture to a simple geometry around the object, and then map that onto the actual object. Generally, this can either be done with cylindrical, spherical or box mapping. The second step (mapping from intermediate object to actual object) has three methods: using the normals of the intermediate object, using the normals of the target object, or using vectors from the center of the target object.
+
+Sidenote: it's also possible to break a complex object down into individual parts and apply texture mapping to those individual parts instead of directly on the whole object.
+
+### Aliasing
+
+When an object has a fine texture and is far enough in space, simply using the above method will result in a problem called aliasing. As shown in the image below, when you sample using the grid of pixels of your screen, entire parts of the texture will be ignored even if it's half of the texture (the blue gets ignored but it's really important).
+
+![aliasing problem](image-31.png)
+
+One solution to this is area averaging. This method takes the area of a surface instead of a point and takes the average of this area of the texture.
+
+![area averaging](image-32.png)
+
+Another problem that exists is when a small part of a texture gets mapped to a large part of the surface (magnification), or when a large part of a texture gets mapped to a small part of the surface (minification). To fight this, mipmaps exist. This is basically a pyramid structure with various levels of details for a texture. Now, when viewing an object from a distance, you can just take the correct level of detail to sample the texture from, or interpolate between two levels (either bilinear or trilinear).
+
+However, this can result in a blurred or too averaged color (e.g. the checkerboard that became completely gray). An improvement on this is anisotropic mipmap filtering. This has largely the same technique, but instead of sampling from an equal area around the pixel, a skewed area gets sampled. This in turns requires an anisotropic mipmap pyramid. Instead of simply downsampling the texture, you now also make a squashed version in each direction for each level (e.g. one horizontal and one vertical downscaled version).
+
+![anisotropic mipmap](image-33.png)
+
+In the image below, the difference in how isotropic vs anisotropic works can be seen.
+
+![isotropic  vs anisotropic](image-34.png)
+
+**Environment mapping** is the concept of mapping the environment onto an object, mostly to make it look transparent or reflective. This is either done by using a cube or a sphere.
+
+> **Environment mapping** is used for mapping an environment on an object to make it look either **reflective** or **transparent**.
+
+**Bump mapping** applies an illusion of height displacement on an object by influencing the way light interacts with the object, but doesn't actually change the geometry of the object. By mapping a "texture" on the object where each pixel is a grayscale value indicating how much displacement should be there. This does have a problem where the illusion break at certain viewing distances or camera angles, because the bumps aren't really applied to the model, just simulated. This is improved by **displacement maps**. This does apply changes to the underlying mesh instead of faking it.
+
+When great detail or high realism is needed and computational complexity can be high, displacement maps are a good choice. For high performance scenarios where fine details are needed and closeups won't often happen, bump maps are better. For example, in a videogame an object which the player can hold vs a wall of the environment.
+
+> Bump mapping changes the look of an object by influencing the way it interacts with light, but doesn't change the actual geometry, meaning that from certain angles the object still appears flat (for example when looking at the edge). Displacement mapping solves this by actually changing the geometry of the object (the vertex placement, not the normals).
 
 ## 6: Viewing in 3D

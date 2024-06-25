@@ -49,6 +49,7 @@
       - [Parallel projections](#parallel-projections)
       - [Perspective projections](#perspective-projections)
     - [Synthetic Camera Model](#synthetic-camera-model)
+    - [Maths Behind Projection](#maths-behind-projection)
 
 ## 1: Introduction
 
@@ -158,13 +159,15 @@ When comparing these strategies, it's obvious that a first distinction is that t
 
 ### Wavelet-based Mesh Coding
 
-The general idea of wavelets is to transform a signal to have a frequency signal representation that's still properly localized in time, giving a general overview while also giving insights to important details.
+The general idea of wavelets is to transform a signal to have a frequency signal representation that's still properly localized in time, giving a **general overview** while also giving **insights to details**.
 
 It's possible to subdivide a mesh into odd and even vertices. After assigning these labels, the goal is to **predict the odd vertices from the even vertices**, and record the difference between the prediction and the real values.
 
-This however isn't enough, because the low resolution model won't end up looking well (imagine subsampling an image purely by selecting a pixel from a 2x2 space, the subsampled will eventually look really bad). For this reason, the scheme is extended with an update to the even vertices.
+This however isn't enough, because the low resolution model won't end up looking well (imagine subsampling an image purely by selecting a pixel from a 2x2 space, the subsampled will eventually look really bad). For this reason, the scheme is extended with an **update to the even vertices**.
 
 The result is a step by step subsampling process where, for each step, all vertices are grouped into odds and evens (one vertex is chosen as a starting point and recursively the neighbors are chosen as odd or even, meaning that it's random if a vertex is odd or even), the odds are predicted from the evens and the difference is stored, and the evens get an update to still look good after many subsampling steps.
+
+When applying this method to a mesh, a start vertex is randomly chosen, the neighbors are then alternatively marked as odd and even.
 
 ### Transformations
 
@@ -315,7 +318,7 @@ From this, make a weighted graph structure where the edge weights are denoted wi
 
 This equation shows the energy which has to be minimized. Basically, the first part is for the distance to the existing voxels, and the second part is for keeping the total surface of the mesh small (you don't want it to randomly get huge). This results in a surface defined in an image, congratulations! 🎉
 
-But how do you go from a mesh to an image? One way is using the marching cubes algorithm, another is using the voxel split-edges.
+But how do you go from an image to a mesh? One way is using the marching cubes algorithm, another is using the voxel split-edges.
 
 If you connect all the split-edges of the voxels, you can already create some vertices and edges. This can then be further subdivided using the loops created by the voxel edges.
 
@@ -375,6 +378,8 @@ Binary space partitioning trees subdivide the space into segments using hyperpla
 These are good for complex scenes because of efficient storage but only for static because it's expensive to recompute.
 
 It's a good idea to use both octrees and bsp trees for games; one for the dynamic requirements, and one for the complex static requirements.
+
+> Octrees are simple and great for dynamic scenes, but grow quickly so it's best for simple scenes. BSP trees are better for complex scenes because of the efficient tree builing, but this also means it's best for static scenes. K-d trees are a good in-between. It's common to use both octrees and BSP trees in a scene that requires both types.
 
 ### Fractals
 
@@ -571,7 +576,7 @@ One solution to this is area averaging. This method takes the area of a surface 
 
 ![area averaging](image-32.png)
 
-Another problem that exists is when a small part of a texture gets mapped to a large part of the surface (magnification), or when a large part of a texture gets mapped to a small part of the surface (minification). To fight this, mipmaps exist. This is basically a pyramid structure with various levels of details for a texture. Now, when viewing an object from a distance, you can just take the correct level of detail to sample the texture from, or interpolate between two levels (either bilinear or trilinear).
+Another problem that exists is when a small part of a texture gets mapped to a large part of the surface (magnification), or when a large part of a texture gets mapped to a small part of the surface (minification). To fight this, mipmaps exist. This is basically a pyramid structure with various levels of details for a texture. Now, when viewing an object from a distance, you can just take the correct level of detail to sample the texture from, or interpolate between two levels (either bilinear (using one level of detail) or trilinear (using both levels of detail)).
 
 However, this can result in a blurred or too averaged color (e.g. the checkerboard that became completely gray). An improvement on this is anisotropic mipmap filtering. This has largely the same technique, but instead of sampling from an equal area around the pixel, a skewed area gets sampled. This in turns requires an anisotropic mipmap pyramid. Instead of simply downsampling the texture, you now also make a squashed version in each direction for each level (e.g. one horizontal and one vertical downscaled version).
 
@@ -595,9 +600,9 @@ When great detail or high realism is needed and computational complexity can be 
 
 Coming at the end, we can now see how we actually project our 3D world onto our 2D screen! The conceptual model for rendering a scene onto a screen has a few steps:
 
-1. Clip objects against view frustum: objects that aren't in sight are useless to use for that moment, so ignore them
-2. Project onto view plane: the objects which are visible are projected onto a flat surface
-3. Transform into viewport: the viewplane is further transformed into the desired viewport
+1. **Clip** objects against view frustum: objects that aren't in sight are useless to use for that moment, so ignore them
+2. **Project** onto view plane: the objects which are visible are projected onto a flat surface
+3. **Transform** into viewport: the viewplane is further transformed into the desired viewport
 
 ### Planar Geometric Projections
 
@@ -613,7 +618,7 @@ When looking at parallel projections, the first distinction is based on the Dire
 
 ![parallel projections](image-36.png)
 
-Axonometric projections in turn can be further subdivided based on the angle between the VPN and the axes of the object. If all axes create the same angle, it's isometric projection. Two axes makes dimetric and one makes trimetric. The phenomenon where the length of an object gets shorter based on the viewing angle is called foreshortening (imagine looking at a pencil and then turning the tip towards your eye, slowly making the pencil appear more and more short). Apparently foreshoretening can look natural or unnatural, but Danilo didn't mention either case lol.
+Axonometric projections in turn can be further subdivided based on the angle between the VPN and the axes of the object. If all axes create the same angle, it's isometric projection. Two axes makes dimetric and one makes trimetric. The phenomenon where the length of an object gets shorter based on the viewing angle is called foreshortening (imagine looking at a pencil and then turning the tip towards your eye, slowly making the pencil appear more and more short). Apparently foreshoretening can look natural or unnatural, but Danilo didn't mention either case lol. (My intuition is that perspective foreshoretening (non-uniform foreshortening) foreshortens more if something is in the distance and appears smaller, while parallel foreshoretening (uniform foreshortening) just foreshortens by some factor regardless of distance)
 
 Oblique projection has two subcategories: cavalier and cabinet projection. This is based on whether or not the object undergoes foreshortening. **Cavalier** applies no foreshortening, so all lines of the object retain their original length. **Cabinet** does apply foreshortening, mostly with a factor of 0.5 (foreshortened lines are only half as long).
 
@@ -647,3 +652,31 @@ The fiels of view can be defined with two angles (width and height), but is most
 The View Reference System (or View Reference Coordinates; VRC) is the right-handed system u-v-n, where v has the same direction as the View Up vector, n is the view plane normal, and u is an extra parameter to complete the right-hand system. The slide below shows a nice summary of this synthetic camera model. Note that the look vector is the same as the direction of projection, so if the view plane isn't perpendicular to the look vector, you get a distorted perspective projection, or **oblique** parallel projection!
 
 ![synthetic camera view volume](image-39.png)
+
+### Maths Behind Projection
+
+First step is to project the VRC (view reference coordinates) to WC (world coordinates).
+
+![VRC to WC](image-40.png)
+
+An example transformation matrix for parallel projections is shown below. This simply sets the z coordinate to 0, projecting all points on the xy plane.
+
+![parallel projection](image-41.png)
+
+Perspective projection makes use of the similarity of triangles to get the factor with which x and y coordinates need to be scaled when projected, as shown below.
+
+![perspective projection](image-42.png)
+
+The resulting matrix transformation:
+
+![parallel projection matrix](image-43.png)
+
+Another option is to project it to `z=0`.
+
+![perspective projection z = 0](image-44.png)
+
+Now, one problem we have is that the view volume is arbitrary, so how do we efficiently do clipping in whatever viewing volume we have? The solution is to first transform everything to a **canonical view volume**, and then apply clipping using efficient algorithms based on this canonical view volume. This means that the clipping step mentioned in the beginning of this chapter comprises of transforming to a canonical view (normalizing the view) and then clipping. Parallel and perspective projections have different canonical view volumes, shown below.
+
+![canonical view volumes](image-45.png)
+
+Parallel makes use of x and y ranging from -1 to 1, and z ranging from 0 to -1. Perspective projection is rather similar, where the back plane goes from (-1, -1, -1) to (1, 1, -1).
